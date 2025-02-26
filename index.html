@@ -1,384 +1,244 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>多機能ランダム迷路RPG（アイコン版＋修正）</title>
+  <meta charset="UTF-8" />
+  <title>漢字＆色分け迷路RPG（修正：アイテムが一緒に動かない）</title>
 
-  <!-- 【修正】 Font Awesome: integrity と crossorigin を削除 -->
-  <link
-    rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css"
-  />
+  <!-- スマホ向けビューポート -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <style>
-    /* 3カラムレイアウト */
     body {
-      margin: 0; 
-      padding: 0;
+      margin: 0; padding: 0;
       background: #222;
       color: #ddd;
       font-family: sans-serif;
       display: flex; 
+      flex-direction: column;
+      align-items: center;
     }
-    /* 左ペイン: 操作情報やランキングなど */
-    #leftPane {
-      width: 240px;
-      padding: 10px;
-      box-sizing: border-box;
+    #statusBar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      background: #333; color: #fff;
+      padding: 8px; box-sizing: border-box;
+      text-align: center; z-index: 999;
     }
-    /* 中央ペイン: ゲームキャンバス */
-    #centerPane {
-      flex: 1;  
+    #mainContent {
+      padding-top: 60px; /* 上のステータスバー分 */
+      width: 100%; max-width: 640px; box-sizing: border-box;
       text-align: center;
     }
-    /* 右ペイン: 凡例 */
-    #rightPane {
-      width: 240px;
-      padding: 10px;
-      box-sizing: border-box;
-    }
-    #gameUI > div {
-      margin-bottom: 6px;
-    }
-    #rankingArea {
-      margin-top: 10px;
+    #startBtn {
+      font-size: 18px; padding: 8px 16px; margin: 10px 0;
+      background: #555; color: #fff; border: 1px solid #888; border-radius: 6px;
     }
     canvas {
-      background: #000;
-      touch-action: none;
       display: block;
-      margin: 0 auto;
+      width: 100%; height: auto; 
+      background: #000;
+      margin: 0 auto; touch-action: none;
     }
-    /* 凡例・色見本 */
-    .legendBlock {
-      display: inline-block;
-      width: 16px;
-      height: 16px;
-      margin-right: 6px;
-      vertical-align: middle;
-      border: 1px solid #888;
-    }
-    .legendItem {
-      margin: 3px 0;
-    }
-
-    /* スマホ用矢印ボタン */
     #touchControls {
-      margin-top: 8px;
-      display: inline-block;
-      text-align: center;
+      margin-top: 10px; text-align: center; display: none;
     }
     #touchControls .row {
-      display: flex;
-      justify-content: center;
-      margin: 3px 0;
+      display: flex; justify-content: center; margin: 4px 0;
     }
     #touchControls button {
-      font-size: 20px;
-      width: 48px;
-      height: 48px;
-      margin: 2px;
-      border: 1px solid #888;
-      background: #555;
-      color: #fff;
+      font-size: 24px; width: 60px; height: 60px;
+      margin: 3px; border: 1px solid #888;
+      background: #555; color: #fff; border-radius: 8px;
+    }
+    #legend {
+      margin-top: 10px; text-align: center; display: none;
+    }
+    .legendItem {
+      display: inline-block; margin: 4px;
     }
   </style>
 </head>
 <body>
 
-<!-- 左ペイン（操作＆情報） -->
-<div id="leftPane">
-  <h2>操作＆情報</h2>
-  <div id="gameUI">
-    <div>
-      <label>幅(列数): <input type="number" id="mazeWidth" value="15" min="5"></label><br>
-      <label>高さ(行数): <input type="number" id="mazeHeight" value="15" min="5"></label><br>
-      <button id="startGameBtn">ゲーム開始</button>
-    </div>
-    <div>フロア: <span id="floorNum">1</span></div>
-    <div>HP: <span id="hp">10</span> / <span id="maxHp">10</span></div>
-    <div>満腹度: <span id="fullness">300</span></div>
-    <div>剣耐久度: <span id="swordDurability">-</span></div>
-    <div>鍵: <span id="keyCount">0</span></div>
-    <div>時間: <span id="time">0.00</span> 秒</div>
-
-    <!-- 【追加】スマホ用矢印ボタン -->
-    <div id="touchControls">
-      <div class="row">
-        <button onclick="movePlayer(0, -1)">▲</button>
-      </div>
-      <div class="row">
-        <button onclick="movePlayer(-1, 0)">◀</button>
-        <button onclick="movePlayer(1, 0)">▶</button>
-      </div>
-      <div class="row">
-        <button onclick="movePlayer(0, 1)">▼</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="rankingArea">
-    <h3>ランキング (最大到達階)</h3>
-    <ol id="rankingList"></ol>
-  </div>
+<!-- ステータスバー -->
+<div id="statusBar">
+  フロア: <span id="floorNum">-</span>　
+  HP: <span id="hp">-</span>/<span id="maxHp">-</span>　
+  満腹度: <span id="fullness">-</span>　
+  剣耐久: <span id="swordDurability">-</span>　
+  鍵: <span id="keyCount">-</span>
 </div>
 
-<!-- 中央ペイン（ゲーム画面） -->
-<div id="centerPane">
-  <h1>多機能ランダム迷路RPG</h1>
-  <canvas id="gameCanvas" width="480" height="480"></canvas>
-</div>
+<div id="mainContent">
+  <!-- 開始ボタン -->
+  <button id="startBtn">ゲーム開始</button>
 
-<!-- 右ペイン（凡例） -->
-<div id="rightPane">
-  <h2>凡例</h2>
-  <div class="legendItem">
-    <span class="legendBlock" style="background:#ccc;"></span>道
+  <!-- キャンバス（最初は非表示）-->
+  <canvas id="gameCanvas" width="480" height="480" style="display:none;"></canvas>
+
+  <!-- スマホ向けボタン（最初は非表示） -->
+  <div id="touchControls">
+    <div class="row">
+      <button onclick="movePlayer(0, -1)">▲</button>
+    </div>
+    <div class="row">
+      <button onclick="movePlayer(-1, 0)">◀</button>
+      <button onclick="movePlayer(1, 0)">▶</button>
+    </div>
+    <div class="row">
+      <button onclick="movePlayer(0, 1)">▼</button>
+    </div>
   </div>
-  <div class="legendItem">
-    <span class="legendBlock" style="background:#444;"></span>壁
-  </div>
-  <div class="legendItem">
-    <span class="legendBlock" style="background:blue;"></span>プレイヤー(円)
-  </div>
-  <div class="legendItem">
-    <span class="legendBlock" style="background:gold;"></span>鍵
-  </div>
-  <div class="legendItem">
-    <span class="legendBlock" style="background:#666;"></span>扉(鍵無)
-  </div>
-  <div class="legendItem">
-    <span class="legendBlock" style="background:#09f;"></span>扉(鍵有)
-  </div>
-  <div class="legendItem">
-    <span class="legendBlock" style="background:#0f9;"></span>出口
-  </div>
-  <div class="legendItem">
-    <span class="legendBlock" style="background:red;"></span>トラップ
-  </div>
-  <div class="legendItem">
-    <span class="legendBlock" style="background:#f0f;"></span>ポーション(HP回復)
-  </div>
-  <div class="legendItem">
-    <span class="legendBlock" style="background:green;"></span>フード(満腹度回復)
-  </div>
-  <div class="legendItem">
-    <span class="legendBlock" style="background:orange;"></span>ライフアップ(最大HP+10)
-  </div>
-  <div class="legendItem">
-    <span class="legendBlock" style="background:silver;"></span>剣(耐久10)
-  </div>
-  <div class="legendItem">
-    <span class="legendBlock" style="background:purple;"></span>敵
+
+  <!-- 凡例（漢字+色） -->
+  <div id="legend">
+    <div class="legendItem" style="color:#f00;">罠</div>
+    <div class="legendItem" style="color:#0f0;">食</div>
+    <div class="legendItem" style="color:#f0f;">薬</div>
+    <div class="legendItem" style="color:orange;">命</div>
+    <div class="legendItem" style="color:silver;">剣</div>
+    <div class="legendItem" style="color:gold;">鍵</div>
+    <div class="legendItem" style="color:purple;">敵</div>
+    <div class="legendItem" style="color:cyan;">扉</div>
+    <div class="legendItem" style="color:lime;">出</div>
   </div>
 </div>
 
 <script>
-/* 
-  -------------------------------------------------------------
-   多階層ランダム迷路RPG with WebFont Icons & 修正
-   - integrity を削除してSRIエラーを回避
-   - スマホ用上下左右ボタンを設置
-------------------------------------------------------------- */
-
 /* ===========================================
-   アイコン定義 (Font Awesome Free)
-=========================================== */
-const ICONS = {
-  potion: "\uf486",      // fa-prescription-bottle
-  food: "\uf5d1",        // fa-apple-alt
-  lifeUp: "\uf621",      // fa-star-of-life
-  sword: "\uf71c",       // fa-sword
-  key: "\uf084",         // fa-key
-  enemy: "\uf6e2",       // fa-ghost
-  trap: "\uf54c",        // fa-skull
-  doorClosed: "\uf52a",  // fa-door-closed
-  doorOpen: "\uf52b",    // fa-door-open
-  exit: "\uf2f5",        // fa-sign-out-alt
-};
-
-/* アイコン描画 */
-function drawIcon(ctx, iconUnicode, x, y, size=32, color='white') {
-  ctx.font = `${size}px "Font Awesome 6 Free"`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillStyle = color;
-  ctx.fillText(iconUnicode, x + size/2, y + size/2);
-}
-
-/* サウンド (Base64) */
-const soundKeyData = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAIARKwAABCxAgAEABAAZGF0YQAAAAA=";   
-const soundDoorData = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAIARKwAABCxAgAEABAAZGF0YQAAAAA=";  
-const soundTrapData = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAIARKwAABCxAgAEABAAZGF0YQAAAAA=";  
-const soundPotionData = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAIARKwAABCxAgAEABAAZGF0YQAAAAA=";
-const soundSwordData = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAIARKwAABCxAgAEABAAZGF0YQAAAAA=";  
-const soundEnemyHitData = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAIARKwAABCxAgAEABAAZGF0YQAAAAA=";  
-
-const keySound = new Audio(soundKeyData);
-const doorSound = new Audio(soundDoorData);
-const trapSound = new Audio(soundTrapData);
-const potionSound = new Audio(soundPotionData);
-const swordSound = new Audio(soundSwordData);
-const enemyHitSound = new Audio(soundEnemyHitData);
-
-/* ===========================================
-   迷路生成 (Prim法)
-=========================================== */
-function generateMaze(rows, cols) {
-  const R = rows + 2;
-  const C = cols + 2;
-  let maze = [];
-  for (let y=0; y<R; y++){
-    maze[y] = [];
-    for (let x=0; x<C; x++){
-      maze[y][x] = (y===0||y===R-1||x===0||x===C-1) ? 1 : 1;
-    }
-  }
-  let walls = [];
-  let startY=1, startX=1;
-  maze[startY][startX] = 0;
-  walls.push([startY-1,startX],[startY+1,startX],[startY,startX-1],[startY,startX+1]);
-
-  while(walls.length>0){
-    let idx=Math.floor(Math.random()*walls.length);
-    let [wy,wx] = walls[idx];
-    walls.splice(idx,1);
-
-    let countFloor=0;
-    let dirs=[[0,1],[0,-1],[1,0],[-1,0]];
-    for(let [dy,dx] of dirs){
-      let ny=wy+dy, nx=wx+dx;
-      if(ny<0||nx<0||ny>=R||nx>=C) continue;
-      if(maze[ny][nx]===0) countFloor++;
-    }
-    if(countFloor===1){
-      maze[wy][wx]=0;
-      for(let [dy,dx] of dirs){
-        let ny=wy+dy, nx=wx+dx;
-        if(ny<0||nx<0||ny>=R||nx>=C) continue;
-        if(maze[ny][nx]===1){
-          walls.push([ny,nx]);
-        }
-      }
-    }
-  }
-  return maze;
-}
-
-/* ===========================================
-   グローバル変数
+   1) 変数・定数
 =========================================== */
 let canvas, ctx;
+let cellSize = 40;
+
+// 迷路データ (マス)
 let MAZE_ROWS, MAZE_COLS;
-let maze;
+let maze; // 2次元配列: 0=道,1=壁
 
-let cellSize=32;
+// プレイヤー (マス座標)
 let playerX=0, playerY=0;
+// ピクセル座標 (アニメ用)
 let playerPX=0, playerPY=0;
-let hasKey=false;
-let swordDurability=0;
-let maxHP=10;
-let HP=10;
-let fullness=300; // 満腹度 初期300
 
-let keysInFloor=[];
+let maxHP=10, HP=10;
+let fullness=300;
+let swordDurability=0;
+let hasKey=false;
+let currentFloor=1;
+
+// アイテム/敵 (マス座標)
 let traps=[];
-let potions=[];
 let foods=[];
+let potions=[];
 let lifeUps=[];
 let swords=[];
+let keysInFloor=[];
 let enemies=[];
 
+// 扉・出口 (マス座標)
 let doorX, doorY;
 let exitX, exitY;
 
-let currentFloor=1;
-let startTime=0;
-let timerId=null;
 let gameActive=false;
-
+let timerId=null;
+let startTime=0;
 let lastFrameTime=0;
-let moveSpeed=6;
+let moveSpeed=8;
 
 let enemyMoveTimer=0;
-let enemyMoveInterval=1000;
+let enemyMoveInterval=1200;
+
+// 漢字ラベル+色 (マス描画用)
+const LABELS = {
+  trap:  { text: "罠",  color: "#f00" },
+  food:  { text: "食",  color: "#0f0" },
+  potion:{ text: "薬",  color: "#f0f" },
+  lifeUp:{ text: "命",  color: "orange" },
+  sword: { text: "剣",  color: "silver" },
+  key:   { text: "鍵",  color: "gold" },
+  enemy: { text: "敵",  color: "purple" },
+  doorClosed: { text: "扉", color: "#666" },
+  doorOpen:   { text: "扉", color: "cyan" },
+  exit:  { text: "出",  color: "lime" }
+};
 
 /* ===========================================
-   フロア開始
+   2) 開始ボタンでゲーム開始
 =========================================== */
+function startGame(){
+  document.getElementById('gameCanvas').style.display="";
+  document.getElementById('touchControls').style.display="";
+  document.getElementById('legend').style.display="";
+
+  maxHP=10; HP=10; fullness=300; swordDurability=0;
+  hasKey=false; currentFloor=1;
+
+  startFloor(15, 15);
+}
+
+/* フロア開始 */
 function startFloor(rows, cols){
-  MAZE_ROWS=rows+2;
-  MAZE_COLS=cols+2;
-  maze=generateMaze(rows, cols);
+  MAZE_ROWS = rows + 2;
+  MAZE_COLS = cols + 2;
+  maze = generateMaze(rows, cols);
 
-  hasKey=false;
-  swordDurability=0;
-  keysInFloor=[];
-  traps=[];
-  potions=[];
-  foods=[];
-  lifeUps=[];
-  swords=[];
-  enemies=[];
+  traps=[]; foods=[]; potions=[]; lifeUps=[];
+  swords=[]; keysInFloor=[]; enemies=[];
 
-  // プレイヤー位置
-  [playerY, playerX]=findRandomFloorCell();
-  playerPX=playerX*cellSize;
-  playerPY=playerY*cellSize;
+  // プレイヤー初期位置 (マス)
+  [playerY, playerX] = findRandomFloorCell();
+  // ピクセル座標も同期
+  playerPX = playerX * cellSize;
+  playerPY = playerY * cellSize;
 
-  // 各種オブジェクト配置
-  // 鍵1
+  // アイテム等をランダム配置
+  // 鍵
   {
     let [ky,kx]=findRandomFloorCell();
-    keysInFloor.push({y:ky,x:kx});
+    keysInFloor.push({x:kx,y:ky});
   }
-  // 扉＆出口
-  [doorY,doorX]=findRandomFloorCell();
-  [exitY,exitX]=findRandomFloorCell();
+  // 扉, 出口
+  [doorY, doorX] = findRandomFloorCell();
+  [exitY, exitX] = findRandomFloorCell();
 
-  // トラップ5
+  // 罠(5)
   for(let i=0;i<5;i++){
     let [ty,tx]=findRandomFloorCell();
-    traps.push({y:ty,x:tx});
+    traps.push({x:tx,y:ty});
   }
-  // ポーション3
-  for(let i=0;i<3;i++){
-    let [py,px]=findRandomFloorCell();
-    potions.push({y:py,x:px});
-  }
-  // フード3
+  // 食(3)
   for(let i=0;i<3;i++){
     let [fy,fx]=findRandomFloorCell();
-    foods.push({y:fy,x:fx});
+    foods.push({x:fx,y:fy});
   }
-  // ライフアップ1
+  // 薬(3)
+  for(let i=0;i<3;i++){
+    let [py,px]=findRandomFloorCell();
+    potions.push({x:px,y:py});
+  }
+  // 命(1)
   {
     let [ly,lx]=findRandomFloorCell();
-    lifeUps.push({y:ly,x:lx});
+    lifeUps.push({x:lx,y:ly});
   }
-  // 剣1
+  // 剣(1)
   {
     let [sy,sx]=findRandomFloorCell();
-    swords.push({y:sy,x:sx});
+    swords.push({x:sx,y:sy});
   }
-  // 敵2
+  // 敵(2)
   for(let i=0;i<2;i++){
     let [ey,ex]=findRandomFloorCell();
-    enemies.push({y:ey,x:ex,collisionsLeft:3});
+    enemies.push({x:ex,y:ey, collisionsLeft:3});
   }
 
   // UI更新
-  document.getElementById('floorNum').textContent=currentFloor;
-  document.getElementById('hp').textContent=HP;
-  document.getElementById('maxHp').textContent=maxHP;
-  document.getElementById('fullness').textContent=fullness;
-  document.getElementById('swordDurability').textContent=swordDurability>0?swordDurability:"-";
-  document.getElementById('keyCount').textContent=0;
+  updateUI_Immediate();
 
-  // タイマー
+  // タイマー開始
   startTime=Date.now();
   if(timerId) clearInterval(timerId);
-  timerId=setInterval(updateTimer,100);
+  timerId=setInterval(()=>{/*タイマー更新*/},100);
 
   gameActive=true;
   lastFrameTime=performance.now();
@@ -386,42 +246,78 @@ function startFloor(rows, cols){
   requestAnimationFrame(gameLoop);
 }
 
+/* ===========================================
+   3) 迷路生成 (Prim法)
+=========================================== */
+function generateMaze(rows, cols){
+  const R = rows+2, C = cols+2;
+  let m=[];
+  for(let y=0;y<R;y++){
+    m[y]=[];
+    for(let x=0;x<C;x++){
+      m[y][x]= (y===0||y===R-1||x===0||x===C-1)?1:1;
+    }
+  }
+  let walls=[];
+  let startY=1, startX=1;
+  m[startY][startX]=0;
+  walls.push([startY-1,startX],[startY+1,startX],[startY,startX-1],[startY,startX+1]);
+
+  while(walls.length>0){
+    let idx=Math.floor(Math.random()*walls.length);
+    let [wy,wx]=walls[idx]; walls.splice(idx,1);
+
+    let countFloor=0;
+    let dirs=[[0,1],[0,-1],[1,0],[-1,0]];
+    for(let [dy,dx] of dirs){
+      let ny=wy+dy,nx=wx+dx;
+      if(m[ny]&&m[ny][nx]===0) countFloor++;
+    }
+    if(countFloor===1){
+      m[wy][wx]=0;
+      for(let [dy,dx] of dirs){
+        let ny=wy+dy,nx=wx+dx;
+        if(ny>0&&ny<R-1&&nx>0&&nx<C-1&&m[ny][nx]===1){
+          walls.push([ny,nx]);
+        }
+      }
+    }
+  }
+  return m;
+}
+
+/* ===========================================
+   4) 乱数で道マスを探す
+=========================================== */
 function findRandomFloorCell(){
   while(true){
     let y=Math.floor(Math.random()*MAZE_ROWS);
     let x=Math.floor(Math.random()*MAZE_COLS);
-    if(maze[y] && maze[y][x]===0){
-      return [y,x];
-    }
+    if(maze[y]&&maze[y][x]===0) return [y,x];
   }
-}
-function updateTimer(){
-  let now=Date.now();
-  let elapsed=(now-startTime)/1000;
-  document.getElementById('time').textContent=elapsed.toFixed(2);
 }
 
 /* ===========================================
-   ゲームループ
+   5) ゲームループ (アニメ)
 =========================================== */
 function gameLoop(timestamp){
-  if(!gameActive)return;
-  let delta=timestamp-lastFrameTime;
+  if(!gameActive) return;
+  let delta=timestamp - lastFrameTime;
   lastFrameTime=timestamp;
 
-  // プレイヤー移動
-  let tx=playerX*cellSize;
-  let ty=playerY*cellSize;
-  let dx=tx-playerPX;
-  let dy=ty-playerPY;
-  let dist=Math.sqrt(dx*dx+dy*dy);
+  // プレイヤー移動アニメ
+  let tx = playerX * cellSize;
+  let ty = playerY * cellSize;
+  let dx = tx - playerPX;
+  let dy = ty - playerPY;
+  let dist = Math.sqrt(dx*dx + dy*dy);
   if(dist>0){
     let step=moveSpeed;
     if(dist<step){
       playerPX=tx; playerPY=ty;
     } else {
       let r=step/dist;
-      playerPX+=dx*r; playerPY+=dy*r;
+      playerPX += dx*r; playerPY += dy*r;
     }
   }
 
@@ -436,13 +332,13 @@ function gameLoop(timestamp){
   requestAnimationFrame(gameLoop);
 }
 
-/* 敵移動 */
+/* 敵ランダム移動 */
 function moveEnemies(){
   for(let e of enemies){
     let dirs=[[0,1],[0,-1],[1,0],[-1,0]];
-    let [ddy,ddx]=dirs[Math.floor(Math.random()*dirs.length)];
-    let nx=e.x+ddx, ny=e.y+ddy;
-    if(maze[ny] && maze[ny][nx]===0){
+    let [ddy,ddx] = dirs[Math.floor(Math.random()*dirs.length)];
+    let nx = e.x+ddx, ny = e.y+ddy;
+    if(maze[ny]&&maze[ny][nx]===0){
       e.x=nx; e.y=ny;
     }
   }
@@ -450,28 +346,34 @@ function moveEnemies(){
 }
 
 /* ===========================================
-   描画
+   6) 描画 (Canvas)
 =========================================== */
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  let viewW=canvas.width, viewH=canvas.height;
-  let offsetX=playerPX-viewW/2;
-  let offsetY=playerPY-viewH/2;
-  let mazePW=MAZE_COLS*cellSize;
-  let mazePH=MAZE_ROWS*cellSize;
+  let viewW = canvas.width;
+  let viewH = canvas.height;
 
+  // カメラオフセット (プレイヤーを中心に表示)
+  let offsetX = playerPX - viewW/2;
+  let offsetY = playerPY - viewH/2;
+
+  // 迷路の総ピクセルサイズ
+  let mazePW = MAZE_COLS * cellSize;
+  let mazePH = MAZE_ROWS * cellSize;
+
+  // Clamp
   if(offsetX<0) offsetX=0;
   if(offsetY<0) offsetY=0;
-  if(offsetX>mazePW-viewW) offsetX=mazePW-viewW;
-  if(offsetY>mazePH-viewH) offsetY=mazePH-viewH;
+  if(offsetX>mazePW - viewW) offsetX=mazePW - viewW;
+  if(offsetY>mazePH - viewH) offsetY=mazePH - viewH;
 
-  // タイル
-  for(let y=0;y<MAZE_ROWS;y++){
-    for(let x=0;x<MAZE_COLS;x++){
+  // 壁/道
+  for(let y=0; y<MAZE_ROWS; y++){
+    for(let x=0; x<MAZE_COLS; x++){
       let tile=maze[y][x];
-      let px=x*cellSize-offsetX;
-      let py=y*cellSize-offsetY;
+      let px=x*cellSize - offsetX;
+      let py=y*cellSize - offsetY;
       if(px+cellSize<0||px>viewW||py+cellSize<0||py>viewH) continue;
 
       if(tile===1){
@@ -484,133 +386,75 @@ function draw(){
     }
   }
 
-  // トラップ
-  for(let t of traps){
-    let px=t.x*cellSize-offsetX;
-    let py=t.y*cellSize-offsetY;
-    if(px+cellSize<0||px>viewW||py+cellSize<0||py>viewH) continue;
-    drawIcon(ctx, ICONS.trap, px, py, cellSize, "red");
-  }
-
-  // ポーション
-  for(let p of potions){
-    let px=p.x*cellSize-offsetX;
-    let py=p.y*cellSize-offsetY;
-    if(px+cellSize<0||px>viewW||py+cellSize<0||py>viewH) continue;
-    drawIcon(ctx, ICONS.potion, px, py, cellSize, "white");
-  }
-
-  // フード
-  for(let f of foods){
-    let px=f.x*cellSize-offsetX;
-    let py=f.y*cellSize-offsetY;
-    if(px+cellSize<0||px>viewW||py+cellSize<0||py>viewH) continue;
-    drawIcon(ctx, ICONS.food, px, py, cellSize, "white");
-  }
-
-  // ライフアップ
-  for(let l of lifeUps){
-    let px=l.x*cellSize-offsetX;
-    let py=l.y*cellSize-offsetY;
-    if(px+cellSize<0||px>viewW||py+cellSize<0||py>viewH) continue;
-    drawIcon(ctx, ICONS.lifeUp, px, py, cellSize, "orange");
-  }
-
-  // 剣
-  for(let s of swords){
-    let px=s.x*cellSize-offsetX;
-    let py=s.y*cellSize-offsetY;
-    if(px+cellSize<0||px>viewW||py+cellSize<0||py>viewH) continue;
-    drawIcon(ctx, ICONS.sword, px, py, cellSize, "silver");
-  }
-
-  // 鍵
-  for(let k of keysInFloor){
-    let px=k.x*cellSize-offsetX;
-    let py=k.y*cellSize-offsetY;
-    if(px+cellSize<0||px>viewW||py+cellSize<0||py>viewH) continue;
-    drawIcon(ctx, ICONS.key, px, py, cellSize, "gold");
-  }
+  // 各オブジェクトをマス座標 → ピクセルへ変換して描画
+  for(let t of traps)  drawKanji(t.x, t.y, LABELS.trap, offsetX, offsetY);
+  for(let f of foods)  drawKanji(f.x, f.y, LABELS.food, offsetX, offsetY);
+  for(let p of potions)drawKanji(p.x,p.y, LABELS.potion,offsetX, offsetY);
+  for(let l of lifeUps)drawKanji(l.x,l.y, LABELS.lifeUp, offsetX, offsetY);
+  for(let s of swords) drawKanji(s.x,s.y, LABELS.sword, offsetX, offsetY);
+  for(let k of keysInFloor) drawKanji(k.x,k.y, LABELS.key, offsetX, offsetY);
 
   // 扉
   {
-    let px=doorX*cellSize-offsetX;
-    let py=doorY*cellSize-offsetY;
-    if(!(px+cellSize<0||px>viewW||py+cellSize<0||py>viewH)){
-      if(hasKey){
-        // 開いた扉
-        drawIcon(ctx, ICONS.doorOpen, px, py, cellSize, "#09f");
-      } else {
-        // 閉じた扉
-        drawIcon(ctx, ICONS.doorClosed, px, py, cellSize, "#666");
-      }
-    }
+    let obj = (hasKey ? LABELS.doorOpen : LABELS.doorClosed);
+    drawKanji(doorX, doorY, obj, offsetX, offsetY);
   }
-
   // 出口
-  {
-    let px=exitX*cellSize-offsetX;
-    let py=exitY*cellSize-offsetY;
-    if(!(px+cellSize<0||px>viewW||py+cellSize<0||py>viewH)){
-      drawIcon(ctx, ICONS.exit, px, py, cellSize, "#0f9");
-    }
-  }
+  drawKanji(exitX, exitY, LABELS.exit, offsetX, offsetY);
 
   // 敵
   for(let e of enemies){
-    let px=e.x*cellSize-offsetX;
-    let py=e.y*cellSize-offsetY;
-    if(px+cellSize<0||px>viewW||py+cellSize<0||py>viewH) continue;
-    drawIcon(ctx, ICONS.enemy, px, py, cellSize, "purple");
+    drawKanji(e.x,e.y, LABELS.enemy, offsetX, offsetY);
   }
 
-  // プレイヤー (円)
+  // プレイヤーは丸
   {
-    let px=playerPX-offsetX;
-    let py=playerPY-offsetY;
+    let px = playerPX - offsetX;
+    let py = playerPY - offsetY;
     ctx.beginPath();
     ctx.fillStyle="blue";
-    ctx.arc(px+cellSize/2, py+cellSize/2, cellSize/2, 0, Math.PI*2);
+    ctx.arc(px + cellSize/2, py + cellSize/2, cellSize/2, 0, Math.PI*2);
     ctx.fill();
   }
 }
 
-/* ===========================================
-   入力処理 (PC: キー / スマホ: ボタン)
-=========================================== */
-function onKeyDown(e){
-  if(!gameActive)return;
-  let dx=0,dy=0;
-  switch(e.key){
-    case "ArrowUp": case "w": dy=-1;break;
-    case "ArrowDown": case "s": dy=1;break;
-    case "ArrowLeft": case "a": dx=-1;break;
-    case "ArrowRight": case "d": dx=1;break;
-    default:return;
-  }
-  movePlayer(dx,dy);
+/* 漢字をマス座標で描画する */
+function drawKanji(x, y, {text,color}, offX, offY){
+  let px = x * cellSize - offX;
+  let py = y * cellSize - offY;
+
+  // 画面外はスキップ
+  if(px+cellSize<0||px>canvas.width||py+cellSize<0||py>canvas.height) return;
+
+  ctx.fillStyle=color;
+  ctx.font = `${cellSize*0.8}px sans-serif`;
+  ctx.textAlign="center";
+  ctx.textBaseline="middle";
+  ctx.fillText(text, px+cellSize/2, py+cellSize/2);
 }
 
-/* 【追加】スマホの矢印ボタンからも呼び出す */
+/* ===========================================
+   7) 移動＆衝突
+=========================================== */
+// スマホボタン or PCキーで移動
 function movePlayer(dx, dy){
-  // ゲーム外なら無視
-  if(!gameActive)return;
+  if(!gameActive) return;
 
-  let nx=playerX+dx, ny=playerY+dy;
+  let nx = playerX + dx;
+  let ny = playerY + dy;
   if(ny<0||ny>=MAZE_ROWS||nx<0||nx>=MAZE_COLS) return;
   if(maze[ny][nx]===1) return;
 
-  // 扉
+  // 扉判定
   if(ny===doorY && nx===doorX){
-    if(!hasKey) return;
-    doorSound.currentTime=0; doorSound.play();
+    if(!hasKey) return; 
   }
 
-  // 実移動
-  playerX=nx; 
-  playerY=ny;
+  // 実際にマス座標を更新
+  playerX = nx; 
+  playerY = ny;
 
-  // 満腹度
+  // 満腹度＆飢えダメージ
   fullness--;
   if(fullness<0) fullness=0;
   if(fullness===0){
@@ -618,30 +462,19 @@ function movePlayer(dx, dy){
     if(HP<0) HP=0;
   }
 
-  // トラップ判定
-  for(let t of traps){
-    if(t.x===nx && t.y===ny){
+  // 罠
+  for(let i=0;i<traps.length;i++){
+    if(traps[i].x===nx && traps[i].y===ny){
       HP-=3;
       if(HP<0) HP=0;
-      trapSound.currentTime=0; trapSound.play();
       break;
     }
   }
 
-  // ポーション
-  for(let i=0;i<potions.length;i++){
-    if(potions[i].x===nx && potions[i].y===ny){
-      HP+=5;
-      if(HP>maxHP) HP=maxHP;
-      potionSound.currentTime=0; potionSound.play();
-      potions.splice(i,1);
-      break;
-    }
-  }
-
-  // フード
+  // 食
   for(let i=0;i<foods.length;i++){
-    if(foods[i].x===nx && foods[i].y===ny){
+    let f=foods[i];
+    if(f.x===nx&&f.y===ny){
       fullness+=20;
       if(fullness>300) fullness=300;
       foods.splice(i,1);
@@ -649,9 +482,21 @@ function movePlayer(dx, dy){
     }
   }
 
-  // ライフアップ
+  // 薬
+  for(let i=0;i<potions.length;i++){
+    let p=potions[i];
+    if(p.x===nx&&p.y===ny){
+      HP+=5;
+      if(HP>maxHP) HP=maxHP;
+      potions.splice(i,1);
+      break;
+    }
+  }
+
+  // 命
   for(let i=0;i<lifeUps.length;i++){
-    if(lifeUps[i].x===nx && lifeUps[i].y===ny){
+    let l=lifeUps[i];
+    if(l.x===nx&&l.y===ny){
       maxHP+=10;
       HP=maxHP;
       lifeUps.splice(i,1);
@@ -661,9 +506,9 @@ function movePlayer(dx, dy){
 
   // 剣
   for(let i=0;i<swords.length;i++){
-    if(swords[i].x===nx && swords[i].y===ny){
+    let s=swords[i];
+    if(s.x===nx&&s.y===ny){
       swordDurability=10;
-      swordSound.currentTime=0; swordSound.play();
       swords.splice(i,1);
       break;
     }
@@ -671,9 +516,9 @@ function movePlayer(dx, dy){
 
   // 鍵
   for(let i=0;i<keysInFloor.length;i++){
-    if(keysInFloor[i].x===nx && keysInFloor[i].y===ny){
+    let k=keysInFloor[i];
+    if(k.x===nx&&k.y===ny){
       hasKey=true;
-      keySound.currentTime=0; keySound.play();
       keysInFloor.splice(i,1);
       break;
     }
@@ -681,24 +526,107 @@ function movePlayer(dx, dy){
 
   if(HP<=0){
     HP=0;
-    updateUI();
+    updateUI_Immediate();
     gameOver();
     return;
   }
 
+  // 敵衝突
   checkEnemyCollisions();
 
   // 出口
-  if(nx===exitX && ny===exitY){
+  if(nx===exitX&&ny===exitY){
     floorClear();
     return;
   }
 
-  updateUI();
+  updateUI_Immediate();
 }
 
-/* タッチ(スワイプ) - キー操作以外にも残しておく */
-let touchStartX=null,touchStartY=null;
+function checkEnemyCollisions(){
+  for(let i=enemies.length-1;i>=0;i--){
+    let e=enemies[i];
+    if(e.x===playerX && e.y===playerY){
+      if(swordDurability>0){
+        e.collisionsLeft--;
+        swordDurability--;
+        if(swordDurability<0)swordDurability=0;
+        if(e.collisionsLeft<=0) enemies.splice(i,1);
+      } else {
+        HP-=2;
+        if(HP<0) HP=0;
+        e.collisionsLeft--;
+        if(e.collisionsLeft<=0) enemies.splice(i,1);
+        if(HP<=0){
+          HP=0; updateUI_Immediate();
+          gameOver();
+          return;
+        }
+      }
+    }
+  }
+  updateUI_Immediate();
+}
+
+/* フロアクリア */
+function floorClear(){
+  clearInterval(timerId);
+  timerId=null;
+  currentFloor++;
+  startFloor(15,15);
+}
+
+/* ゲームオーバー */
+function gameOver(){
+  gameActive=false;
+  if(timerId){
+    clearInterval(timerId);
+    timerId=null;
+  }
+  alert(`ゲームオーバー！ フロア${currentFloor}で力尽きました...`);
+}
+
+/* UI更新 */
+function updateUI_Immediate(){
+  document.getElementById('floorNum').textContent=currentFloor;
+  document.getElementById('hp').textContent=HP;
+  document.getElementById('maxHp').textContent=maxHP;
+  document.getElementById('fullness').textContent=fullness;
+  document.getElementById('swordDurability').textContent=(swordDurability>0)? swordDurability:"-";
+  document.getElementById('keyCount').textContent=(hasKey?1:0);
+}
+
+/* ===========================================
+   8) イベント: ページロード
+=========================================== */
+window.addEventListener('load', ()=>{
+  canvas=document.getElementById('gameCanvas');
+  ctx=canvas.getContext('2d');
+
+  // PCキー操作
+  document.addEventListener('keydown',(e)=>{
+    if(!gameActive)return;
+    let dx=0, dy=0;
+    switch(e.key){
+      case "ArrowUp":case "w": dy=-1;break;
+      case "ArrowDown":case "s":dy=1;break;
+      case "ArrowLeft":case "a":dx=-1;break;
+      case "ArrowRight":case "d":dx=1;break;
+      default:return;
+    }
+    movePlayer(dx,dy);
+  });
+
+  // スワイプ
+  canvas.addEventListener('touchstart', onTouchStart,{passive:false});
+  canvas.addEventListener('touchend', onTouchEnd,{passive:false});
+
+  // 「ゲーム開始」ボタン
+  document.getElementById('startBtn').addEventListener('click', startGame);
+});
+
+/* スワイプ用変数 */
+let touchStartX=null, touchStartY=null;
 function onTouchStart(e){
   if(e.touches.length===1){
     touchStartX=e.touches[0].clientX;
@@ -706,7 +634,7 @@ function onTouchStart(e){
   }
 }
 function onTouchEnd(e){
-  if(touchStartX===null||touchStartY===null)return;
+  if(touchStartX===null||touchStartY===null) return;
   let dx=e.changedTouches[0].clientX - touchStartX;
   let dy=e.changedTouches[0].clientY - touchStartY;
   let absDx=Math.abs(dx), absDy=Math.abs(dy);
@@ -717,136 +645,6 @@ function onTouchEnd(e){
   }
   touchStartX=null; touchStartY=null;
 }
-
-/* ===========================================
-   敵衝突
-=========================================== */
-function checkEnemyCollisions(){
-  for(let i=enemies.length-1;i>=0;i--){
-    let e=enemies[i];
-    if(e.x===playerX && e.y===playerY){
-      if(swordDurability>0){
-        e.collisionsLeft--;
-        swordDurability--;
-        if(swordDurability<0)swordDurability=0;
-        enemyHitSound.currentTime=0; enemyHitSound.play();
-        if(e.collisionsLeft<=0){
-          enemies.splice(i,1);
-        }
-      } else {
-        HP-=2;
-        if(HP<0) HP=0;
-        e.collisionsLeft--;
-        enemyHitSound.currentTime=0; enemyHitSound.play();
-        if(e.collisionsLeft<=0){
-          enemies.splice(i,1);
-        }
-        if(HP<=0){
-          HP=0;
-          updateUI();
-          gameOver();
-          return;
-        }
-      }
-    }
-  }
-  updateUI();
-}
-
-/* フロアクリア */
-function floorClear(){
-  clearInterval(timerId);
-  timerId=null;
-  addScoreToRanking(currentFloor);
-  currentFloor++;
-  startFloor(
-    parseInt(document.getElementById('mazeHeight').value,10),
-    parseInt(document.getElementById('mazeWidth').value,10)
-  );
-}
-
-/* ゲームオーバー */
-function gameOver(){
-  gameActive=false;
-  if(timerId){
-    clearInterval(timerId);
-    timerId=null;
-  }
-  addScoreToRanking(currentFloor);
-  alert(`ゲームオーバー！${currentFloor}階で力尽きました...`);
-}
-
-/* UI更新 */
-function updateUI(){
-  document.getElementById('hp').textContent=HP;
-  document.getElementById('maxHp').textContent=maxHP;
-  document.getElementById('fullness').textContent=fullness;
-  document.getElementById('keyCount').textContent=hasKey?1:0;
-  document.getElementById('swordDurability').textContent=(swordDurability>0)?swordDurability:"-";
-}
-
-/* ===========================================
-   ランキング (localStorage)
-=========================================== */
-function addScoreToRanking(floor){
-  let now = new Date();
-  let dateStr=now.toLocaleString();
-  let rankingData=localStorage.getItem("mazeRankingIcons");
-  let ranking=[];
-  if(rankingData){
-    try{ ranking=JSON.parse(rankingData);}catch(e){ ranking=[];}
-  }
-  ranking.push({floor,date:dateStr});
-  ranking.sort((a,b)=>b.floor-a.floor);
-  ranking=ranking.slice(0,5);
-  localStorage.setItem("mazeRankingIcons",JSON.stringify(ranking));
-  updateRankingUI(ranking);
-}
-function updateRankingUI(ranking){
-  if(!ranking){
-    let rankingData=localStorage.getItem("mazeRankingIcons");
-    if(rankingData){
-      try{ranking=JSON.parse(rankingData);}catch(e){ranking=[];}
-    } else {
-      ranking=[];
-    }
-  }
-  let list=document.getElementById('rankingList');
-  list.innerHTML="";
-  for(let r of ranking){
-    let li=document.createElement('li');
-    li.textContent=`フロア ${r.floor}階 (${r.date})`;
-    list.appendChild(li);
-  }
-}
-
-/* ===========================================
-   ページロード初期化
-=========================================== */
-window.addEventListener('load',()=>{
-  canvas=document.getElementById('gameCanvas');
-  ctx=canvas.getContext('2d');
-
-  document.addEventListener('keydown',onKeyDown);
-  canvas.addEventListener('touchstart',onTouchStart,{passive:false});
-  canvas.addEventListener('touchend',onTouchEnd,{passive:false});
-
-  updateRankingUI(null);
-
-  // ゲーム開始ボタン
-  document.getElementById('startGameBtn').addEventListener('click',()=>{
-    maxHP=10;
-    HP=10;
-    fullness=300;
-    swordDurability=0;
-    currentFloor=1;
-
-    let w=parseInt(document.getElementById('mazeWidth').value,10);
-    let h=parseInt(document.getElementById('mazeHeight').value,10);
-
-    startFloor(h,w);
-  });
-});
 </script>
 </body>
 </html>
