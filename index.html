@@ -2,15 +2,12 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>多機能ランダム迷路RPG（アイコン版）</title>
+  <title>多機能ランダム迷路RPG（アイコン版＋修正）</title>
 
-  <!-- Font Awesome (無料CDN) -->
+  <!-- 【修正】 Font Awesome: integrity と crossorigin を削除 -->
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css"
-    integrity="sha512-O8C1KphZCA79f9NnV7yR+9Rr0UbdZhUyEHOaJlU41Xd6266NOm89K3YIYKv7GYSu4pSdf8BbiZ3QK8Un9auuHw=="
-    crossorigin="anonymous"
-    referrerpolicy="no-referrer"
   />
 
   <style>
@@ -23,13 +20,13 @@
       font-family: sans-serif;
       display: flex; 
     }
-    /* 左ペイン: 操作情報 */
+    /* 左ペイン: 操作情報やランキングなど */
     #leftPane {
       width: 240px;
       padding: 10px;
       box-sizing: border-box;
     }
-    /* 中央ペイン: ゲーム */
+    /* 中央ペイン: ゲームキャンバス */
     #centerPane {
       flex: 1;  
       text-align: center;
@@ -41,7 +38,7 @@
       box-sizing: border-box;
     }
     #gameUI > div {
-      margin-bottom: 4px;
+      margin-bottom: 6px;
     }
     #rankingArea {
       margin-top: 10px;
@@ -52,6 +49,7 @@
       display: block;
       margin: 0 auto;
     }
+    /* 凡例・色見本 */
     .legendBlock {
       display: inline-block;
       width: 16px;
@@ -63,11 +61,32 @@
     .legendItem {
       margin: 3px 0;
     }
+
+    /* スマホ用矢印ボタン */
+    #touchControls {
+      margin-top: 8px;
+      display: inline-block;
+      text-align: center;
+    }
+    #touchControls .row {
+      display: flex;
+      justify-content: center;
+      margin: 3px 0;
+    }
+    #touchControls button {
+      font-size: 20px;
+      width: 48px;
+      height: 48px;
+      margin: 2px;
+      border: 1px solid #888;
+      background: #555;
+      color: #fff;
+    }
   </style>
 </head>
 <body>
 
-<!-- 左ペイン: 操作＆情報 -->
+<!-- 左ペイン（操作＆情報） -->
 <div id="leftPane">
   <h2>操作＆情報</h2>
   <div id="gameUI">
@@ -82,6 +101,20 @@
     <div>剣耐久度: <span id="swordDurability">-</span></div>
     <div>鍵: <span id="keyCount">0</span></div>
     <div>時間: <span id="time">0.00</span> 秒</div>
+
+    <!-- 【追加】スマホ用矢印ボタン -->
+    <div id="touchControls">
+      <div class="row">
+        <button onclick="movePlayer(0, -1)">▲</button>
+      </div>
+      <div class="row">
+        <button onclick="movePlayer(-1, 0)">◀</button>
+        <button onclick="movePlayer(1, 0)">▶</button>
+      </div>
+      <div class="row">
+        <button onclick="movePlayer(0, 1)">▼</button>
+      </div>
+    </div>
   </div>
 
   <div id="rankingArea">
@@ -90,13 +123,13 @@
   </div>
 </div>
 
-<!-- 中央ペイン: ゲーム -->
+<!-- 中央ペイン（ゲーム画面） -->
 <div id="centerPane">
   <h1>多機能ランダム迷路RPG</h1>
   <canvas id="gameCanvas" width="480" height="480"></canvas>
 </div>
 
-<!-- 右ペイン: 凡例 -->
+<!-- 右ペイン（凡例） -->
 <div id="rightPane">
   <h2>凡例</h2>
   <div class="legendItem">
@@ -142,11 +175,15 @@
 
 <script>
 /* 
-  ============================================
-   1) アイコン定義
-   Font Awesome 6 Free の Unicodeマップ
-   (アイコンはお好みで差し替えOK)
-============================================ */
+  -------------------------------------------------------------
+   多階層ランダム迷路RPG with WebFont Icons & 修正
+   - integrity を削除してSRIエラーを回避
+   - スマホ用上下左右ボタンを設置
+------------------------------------------------------------- */
+
+/* ===========================================
+   アイコン定義 (Font Awesome Free)
+=========================================== */
 const ICONS = {
   potion: "\uf486",      // fa-prescription-bottle
   food: "\uf5d1",        // fa-apple-alt
@@ -160,9 +197,7 @@ const ICONS = {
   exit: "\uf2f5",        // fa-sign-out-alt
 };
 
-/* 
-  アイコン描画ヘルパー関数
-*/
+/* アイコン描画 */
 function drawIcon(ctx, iconUnicode, x, y, size=32, color='white') {
   ctx.font = `${size}px "Font Awesome 6 Free"`;
   ctx.textAlign = "center";
@@ -171,9 +206,7 @@ function drawIcon(ctx, iconUnicode, x, y, size=32, color='white') {
   ctx.fillText(iconUnicode, x + size/2, y + size/2);
 }
 
-/* ===========================================
-   2) サウンド (Base64簡易)
-=========================================== */
+/* サウンド (Base64) */
 const soundKeyData = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAIARKwAABCxAgAEABAAZGF0YQAAAAA=";   
 const soundDoorData = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAIARKwAABCxAgAEABAAZGF0YQAAAAA=";  
 const soundTrapData = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAIARKwAABCxAgAEABAAZGF0YQAAAAA=";  
@@ -189,40 +222,39 @@ const swordSound = new Audio(soundSwordData);
 const enemyHitSound = new Audio(soundEnemyHitData);
 
 /* ===========================================
-   3) 迷路生成 (Prim 法)
+   迷路生成 (Prim法)
 =========================================== */
 function generateMaze(rows, cols) {
   const R = rows + 2;
   const C = cols + 2;
   let maze = [];
-  for (let y = 0; y < R; y++) {
+  for (let y=0; y<R; y++){
     maze[y] = [];
-    for (let x = 0; x < C; x++) {
-      maze[y][x] = (y === 0 || y === R-1 || x === 0 || x === C-1) ? 1 : 1;
+    for (let x=0; x<C; x++){
+      maze[y][x] = (y===0||y===R-1||x===0||x===C-1) ? 1 : 1;
     }
   }
-
   let walls = [];
-  let startY = 1, startX = 1;
+  let startY=1, startX=1;
   maze[startY][startX] = 0;
-  walls.push([startY-1, startX], [startY+1, startX], [startY, startX-1], [startY, startX+1]);
+  walls.push([startY-1,startX],[startY+1,startX],[startY,startX-1],[startY,startX+1]);
 
-  while(walls.length > 0){
-    let idx = Math.floor(Math.random() * walls.length);
-    let [wy, wx] = walls[idx];
+  while(walls.length>0){
+    let idx=Math.floor(Math.random()*walls.length);
+    let [wy,wx] = walls[idx];
     walls.splice(idx,1);
 
-    let countFloor = 0;
-    let dirs = [[-1,0],[1,0],[0,-1],[0,1]];
-    for (let [dy,dx] of dirs){
-      let ny = wy+dy, nx = wx+dx;
+    let countFloor=0;
+    let dirs=[[0,1],[0,-1],[1,0],[-1,0]];
+    for(let [dy,dx] of dirs){
+      let ny=wy+dy, nx=wx+dx;
       if(ny<0||nx<0||ny>=R||nx>=C) continue;
       if(maze[ny][nx]===0) countFloor++;
     }
     if(countFloor===1){
-      maze[wy][wx] = 0;
+      maze[wy][wx]=0;
       for(let [dy,dx] of dirs){
-        let ny = wy+dy, nx = wx+dx;
+        let ny=wy+dy, nx=wx+dx;
         if(ny<0||nx<0||ny>=R||nx>=C) continue;
         if(maze[ny][nx]===1){
           walls.push([ny,nx]);
@@ -234,55 +266,50 @@ function generateMaze(rows, cols) {
 }
 
 /* ===========================================
-   4) ゲーム用グローバル変数
+   グローバル変数
 =========================================== */
 let canvas, ctx;
 let MAZE_ROWS, MAZE_COLS;
-let maze; 
-let cellSize = 32;
+let maze;
 
+let cellSize=32;
 let playerX=0, playerY=0;
-let playerPX=0, playerPY=0; 
+let playerPX=0, playerPY=0;
 let hasKey=false;
-let swordDurability=0; 
+let swordDurability=0;
 let maxHP=10;
 let HP=10;
-let fullness=300;  // 満腹度初期300
+let fullness=300; // 満腹度 初期300
 
-// アイテムなど
-let keysInFloor = [];
-let traps = [];
-let potions = [];
-let foods = [];
-let lifeUps = [];
-let swords = [];
+let keysInFloor=[];
+let traps=[];
+let potions=[];
+let foods=[];
+let lifeUps=[];
+let swords=[];
+let enemies=[];
 
-// 扉・出口
 let doorX, doorY;
 let exitX, exitY;
 
-// 敵
-let enemies = [];
-
-// 多階層
 let currentFloor=1;
 let startTime=0;
 let timerId=null;
 let gameActive=false;
 
-// アニメ
 let lastFrameTime=0;
-let moveSpeed=6; 
-let enemyMoveTimer=0; 
-let enemyMoveInterval=1000; 
+let moveSpeed=6;
+
+let enemyMoveTimer=0;
+let enemyMoveInterval=1000;
 
 /* ===========================================
-   5) フロア開始
+   フロア開始
 =========================================== */
 function startFloor(rows, cols){
-  MAZE_ROWS = rows+2;
-  MAZE_COLS = cols+2;
-  maze = generateMaze(rows,cols);
+  MAZE_ROWS=rows+2;
+  MAZE_COLS=cols+2;
+  maze=generateMaze(rows, cols);
 
   hasKey=false;
   swordDurability=0;
@@ -294,57 +321,64 @@ function startFloor(rows, cols){
   swords=[];
   enemies=[];
 
-  [playerY, playerX] = findRandomFloorCell();
+  // プレイヤー位置
+  [playerY, playerX]=findRandomFloorCell();
   playerPX=playerX*cellSize;
   playerPY=playerY*cellSize;
 
-  // 適当に配置例
+  // 各種オブジェクト配置
+  // 鍵1
   {
-    let [ky,kx] = findRandomFloorCell();
+    let [ky,kx]=findRandomFloorCell();
     keysInFloor.push({y:ky,x:kx});
   }
-  [doorY,doorX] = findRandomFloorCell();
-  [exitY,exitX] = findRandomFloorCell();
+  // 扉＆出口
+  [doorY,doorX]=findRandomFloorCell();
+  [exitY,exitX]=findRandomFloorCell();
 
+  // トラップ5
   for(let i=0;i<5;i++){
-    let [ty,tx] = findRandomFloorCell();
+    let [ty,tx]=findRandomFloorCell();
     traps.push({y:ty,x:tx});
   }
+  // ポーション3
   for(let i=0;i<3;i++){
-    let [py,px] = findRandomFloorCell();
+    let [py,px]=findRandomFloorCell();
     potions.push({y:py,x:px});
   }
+  // フード3
   for(let i=0;i<3;i++){
-    let [fy,fx] = findRandomFloorCell();
+    let [fy,fx]=findRandomFloorCell();
     foods.push({y:fy,x:fx});
   }
+  // ライフアップ1
   {
-    let [ly,lx] = findRandomFloorCell();
+    let [ly,lx]=findRandomFloorCell();
     lifeUps.push({y:ly,x:lx});
   }
+  // 剣1
   {
-    let [sy,sx] = findRandomFloorCell();
+    let [sy,sx]=findRandomFloorCell();
     swords.push({y:sy,x:sx});
   }
-  for(let i=0; i<2; i++){
-    let [ey,ex] = findRandomFloorCell();
-    enemies.push({
-      y:ey, x:ex,
-      collisionsLeft:3
-    });
+  // 敵2
+  for(let i=0;i<2;i++){
+    let [ey,ex]=findRandomFloorCell();
+    enemies.push({y:ey,x:ex,collisionsLeft:3});
   }
 
-  // UI
-  document.getElementById('floorNum').textContent = currentFloor;
-  document.getElementById('hp').textContent = HP;
-  document.getElementById('maxHp').textContent = maxHP;
-  document.getElementById('fullness').textContent = fullness;
-  document.getElementById('swordDurability').textContent = swordDurability>0?swordDurability:"-";
-  document.getElementById('keyCount').textContent = 0;
+  // UI更新
+  document.getElementById('floorNum').textContent=currentFloor;
+  document.getElementById('hp').textContent=HP;
+  document.getElementById('maxHp').textContent=maxHP;
+  document.getElementById('fullness').textContent=fullness;
+  document.getElementById('swordDurability').textContent=swordDurability>0?swordDurability:"-";
+  document.getElementById('keyCount').textContent=0;
 
+  // タイマー
   startTime=Date.now();
   if(timerId) clearInterval(timerId);
-  timerId = setInterval(updateTimer,100);
+  timerId=setInterval(updateTimer,100);
 
   gameActive=true;
   lastFrameTime=performance.now();
@@ -354,8 +388,8 @@ function startFloor(rows, cols){
 
 function findRandomFloorCell(){
   while(true){
-    let y = Math.floor(Math.random()*MAZE_ROWS);
-    let x = Math.floor(Math.random()*MAZE_COLS);
+    let y=Math.floor(Math.random()*MAZE_ROWS);
+    let x=Math.floor(Math.random()*MAZE_COLS);
     if(maze[y] && maze[y][x]===0){
       return [y,x];
     }
@@ -364,32 +398,30 @@ function findRandomFloorCell(){
 function updateTimer(){
   let now=Date.now();
   let elapsed=(now-startTime)/1000;
-  document.getElementById('time').textContent = elapsed.toFixed(2);
+  document.getElementById('time').textContent=elapsed.toFixed(2);
 }
 
 /* ===========================================
-   6) ゲームループ
+   ゲームループ
 =========================================== */
 function gameLoop(timestamp){
-  if(!gameActive) return;
-  let delta = timestamp - lastFrameTime;
+  if(!gameActive)return;
+  let delta=timestamp-lastFrameTime;
   lastFrameTime=timestamp;
 
-  // プレイヤー移動アニメ
+  // プレイヤー移動
   let tx=playerX*cellSize;
   let ty=playerY*cellSize;
   let dx=tx-playerPX;
   let dy=ty-playerPY;
-  let dist=Math.sqrt(dx*dx + dy*dy);
+  let dist=Math.sqrt(dx*dx+dy*dy);
   if(dist>0){
     let step=moveSpeed;
     if(dist<step){
-      playerPX=tx; 
-      playerPY=ty;
+      playerPX=tx; playerPY=ty;
     } else {
       let r=step/dist;
-      playerPX += dx*r;
-      playerPY += dy*r;
+      playerPX+=dx*r; playerPY+=dy*r;
     }
   }
 
@@ -408,8 +440,7 @@ function gameLoop(timestamp){
 function moveEnemies(){
   for(let e of enemies){
     let dirs=[[0,1],[0,-1],[1,0],[-1,0]];
-    let r = Math.floor(Math.random()*dirs.length);
-    let [ddy,ddx] = dirs[r];
+    let [ddy,ddx]=dirs[Math.floor(Math.random()*dirs.length)];
     let nx=e.x+ddx, ny=e.y+ddy;
     if(maze[ny] && maze[ny][nx]===0){
       e.x=nx; e.y=ny;
@@ -419,14 +450,14 @@ function moveEnemies(){
 }
 
 /* ===========================================
-   7) 描画
+   描画
 =========================================== */
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
   let viewW=canvas.width, viewH=canvas.height;
-  let offsetX=playerPX - viewW/2;
-  let offsetY=playerPY - viewH/2;
+  let offsetX=playerPX-viewW/2;
+  let offsetY=playerPY-viewH/2;
   let mazePW=MAZE_COLS*cellSize;
   let mazePH=MAZE_ROWS*cellSize;
 
@@ -435,7 +466,7 @@ function draw(){
   if(offsetX>mazePW-viewW) offsetX=mazePW-viewW;
   if(offsetY>mazePH-viewH) offsetY=mazePH-viewH;
 
-  // タイル描画
+  // タイル
   for(let y=0;y<MAZE_ROWS;y++){
     for(let x=0;x<MAZE_COLS;x++){
       let tile=maze[y][x];
@@ -453,7 +484,7 @@ function draw(){
     }
   }
 
-  // トラップ (アイコン)
+  // トラップ
   for(let t of traps){
     let px=t.x*cellSize-offsetX;
     let py=t.y*cellSize-offsetY;
@@ -507,7 +538,7 @@ function draw(){
     let py=doorY*cellSize-offsetY;
     if(!(px+cellSize<0||px>viewW||py+cellSize<0||py>viewH)){
       if(hasKey){
-        // 開いてる扉
+        // 開いた扉
         drawIcon(ctx, ICONS.doorOpen, px, py, cellSize, "#09f");
       } else {
         // 閉じた扉
@@ -539,17 +570,17 @@ function draw(){
     let py=playerPY-offsetY;
     ctx.beginPath();
     ctx.fillStyle="blue";
-    ctx.arc(px + cellSize/2, py + cellSize/2, cellSize/2, 0, Math.PI*2);
+    ctx.arc(px+cellSize/2, py+cellSize/2, cellSize/2, 0, Math.PI*2);
     ctx.fill();
   }
 }
 
 /* ===========================================
-   8) 入力処理
+   入力処理 (PC: キー / スマホ: ボタン)
 =========================================== */
 function onKeyDown(e){
-  if(!gameActive) return;
-  let dx=0, dy=0;
+  if(!gameActive)return;
+  let dx=0,dy=0;
   switch(e.key){
     case "ArrowUp": case "w": dy=-1;break;
     case "ArrowDown": case "s": dy=1;break;
@@ -560,29 +591,11 @@ function onKeyDown(e){
   movePlayer(dx,dy);
 }
 
-let touchStartX=null,touchStartY=null;
-function onTouchStart(e){
-  if(e.touches.length===1){
-    touchStartX=e.touches[0].clientX;
-    touchStartY=e.touches[0].clientY;
-  }
-}
-function onTouchEnd(e){
-  if(touchStartX===null||touchStartY===null) return;
-  let dx=e.changedTouches[0].clientX - touchStartX;
-  let dy=e.changedTouches[0].clientY - touchStartY;
-  let absDx=Math.abs(dx);
-  let absDy=Math.abs(dy);
-  if(absDx>absDy){
-    if(dx>0) movePlayer(1,0); else movePlayer(-1,0);
-  } else {
-    if(dy>0) movePlayer(0,1); else movePlayer(0,-1);
-  }
-  touchStartX=null; touchStartY=null;
-}
+/* 【追加】スマホの矢印ボタンからも呼び出す */
+function movePlayer(dx, dy){
+  // ゲーム外なら無視
+  if(!gameActive)return;
 
-/* 1マス移動 */
-function movePlayer(dx,dy){
   let nx=playerX+dx, ny=playerY+dy;
   if(ny<0||ny>=MAZE_ROWS||nx<0||nx>=MAZE_COLS) return;
   if(maze[ny][nx]===1) return;
@@ -590,11 +603,12 @@ function movePlayer(dx,dy){
   // 扉
   if(ny===doorY && nx===doorX){
     if(!hasKey) return;
-    doorSound.currentTime=0; 
-    doorSound.play();
+    doorSound.currentTime=0; doorSound.play();
   }
 
-  playerX=nx; playerY=ny;
+  // 実移動
+  playerX=nx; 
+  playerY=ny;
 
   // 満腹度
   fullness--;
@@ -604,13 +618,12 @@ function movePlayer(dx,dy){
     if(HP<0) HP=0;
   }
 
-  // トラップ
+  // トラップ判定
   for(let t of traps){
     if(t.x===nx && t.y===ny){
       HP-=3;
       if(HP<0) HP=0;
-      trapSound.currentTime=0; 
-      trapSound.play();
+      trapSound.currentTime=0; trapSound.play();
       break;
     }
   }
@@ -620,8 +633,7 @@ function movePlayer(dx,dy){
     if(potions[i].x===nx && potions[i].y===ny){
       HP+=5;
       if(HP>maxHP) HP=maxHP;
-      potionSound.currentTime=0; 
-      potionSound.play();
+      potionSound.currentTime=0; potionSound.play();
       potions.splice(i,1);
       break;
     }
@@ -651,8 +663,7 @@ function movePlayer(dx,dy){
   for(let i=0;i<swords.length;i++){
     if(swords[i].x===nx && swords[i].y===ny){
       swordDurability=10;
-      swordSound.currentTime=0; 
-      swordSound.play();
+      swordSound.currentTime=0; swordSound.play();
       swords.splice(i,1);
       break;
     }
@@ -662,8 +673,7 @@ function movePlayer(dx,dy){
   for(let i=0;i<keysInFloor.length;i++){
     if(keysInFloor[i].x===nx && keysInFloor[i].y===ny){
       hasKey=true;
-      keySound.currentTime=0; 
-      keySound.play();
+      keySound.currentTime=0; keySound.play();
       keysInFloor.splice(i,1);
       break;
     }
@@ -687,7 +697,30 @@ function movePlayer(dx,dy){
   updateUI();
 }
 
-/* 敵衝突 */
+/* タッチ(スワイプ) - キー操作以外にも残しておく */
+let touchStartX=null,touchStartY=null;
+function onTouchStart(e){
+  if(e.touches.length===1){
+    touchStartX=e.touches[0].clientX;
+    touchStartY=e.touches[0].clientY;
+  }
+}
+function onTouchEnd(e){
+  if(touchStartX===null||touchStartY===null)return;
+  let dx=e.changedTouches[0].clientX - touchStartX;
+  let dy=e.changedTouches[0].clientY - touchStartY;
+  let absDx=Math.abs(dx), absDy=Math.abs(dy);
+  if(absDx>absDy){
+    if(dx>0) movePlayer(1,0); else movePlayer(-1,0);
+  } else {
+    if(dy>0) movePlayer(0,1); else movePlayer(0,-1);
+  }
+  touchStartX=null; touchStartY=null;
+}
+
+/* ===========================================
+   敵衝突
+=========================================== */
 function checkEnemyCollisions(){
   for(let i=enemies.length-1;i>=0;i--){
     let e=enemies[i];
@@ -696,8 +729,7 @@ function checkEnemyCollisions(){
         e.collisionsLeft--;
         swordDurability--;
         if(swordDurability<0)swordDurability=0;
-        enemyHitSound.currentTime=0; 
-        enemyHitSound.play();
+        enemyHitSound.currentTime=0; enemyHitSound.play();
         if(e.collisionsLeft<=0){
           enemies.splice(i,1);
         }
@@ -705,8 +737,7 @@ function checkEnemyCollisions(){
         HP-=2;
         if(HP<0) HP=0;
         e.collisionsLeft--;
-        enemyHitSound.currentTime=0; 
-        enemyHitSound.play();
+        enemyHitSound.currentTime=0; enemyHitSound.play();
         if(e.collisionsLeft<=0){
           enemies.splice(i,1);
         }
@@ -727,7 +758,6 @@ function floorClear(){
   clearInterval(timerId);
   timerId=null;
   addScoreToRanking(currentFloor);
-
   currentFloor++;
   startFloor(
     parseInt(document.getElementById('mazeHeight').value,10),
@@ -756,7 +786,7 @@ function updateUI(){
 }
 
 /* ===========================================
-   9) ランキング
+   ランキング (localStorage)
 =========================================== */
 function addScoreToRanking(floor){
   let now = new Date();
@@ -772,12 +802,11 @@ function addScoreToRanking(floor){
   localStorage.setItem("mazeRankingIcons",JSON.stringify(ranking));
   updateRankingUI(ranking);
 }
-
 function updateRankingUI(ranking){
   if(!ranking){
     let rankingData=localStorage.getItem("mazeRankingIcons");
     if(rankingData){
-      try{ ranking=JSON.parse(rankingData);}catch(e){ ranking=[];}
+      try{ranking=JSON.parse(rankingData);}catch(e){ranking=[];}
     } else {
       ranking=[];
     }
@@ -792,7 +821,7 @@ function updateRankingUI(ranking){
 }
 
 /* ===========================================
-   10) ページロード初期化
+   ページロード初期化
 =========================================== */
 window.addEventListener('load',()=>{
   canvas=document.getElementById('gameCanvas');
@@ -804,6 +833,7 @@ window.addEventListener('load',()=>{
 
   updateRankingUI(null);
 
+  // ゲーム開始ボタン
   document.getElementById('startGameBtn').addEventListener('click',()=>{
     maxHP=10;
     HP=10;
